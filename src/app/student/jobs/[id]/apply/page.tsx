@@ -307,7 +307,7 @@ const JobApplicationPage: React.FC<JobApplicationPageProps> = ({ params }) => {
                 <Button
                   type="submit"
                   isLoading={isSubmitting}
-                  loadingText="Submitting Application..."
+                  
                 >
                   Submit Application
                 </Button>
