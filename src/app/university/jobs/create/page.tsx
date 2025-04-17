@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useAuth } from '@/contexts/AuthContext';
@@ -31,24 +31,24 @@ const jobSchema = z.object({
     errorMap: () => ({ message: 'Please select a status' }),
   }),
   ctcRange: z.object({
-    min: z.string().min(1, 'Minimum CTC is required').transform(val => Number(val)),
-    max: z.string().min(1, 'Maximum CTC is required').transform(val => Number(val)),
-  }).refine(data => data.max >= data.min, {
+    min: z.string().min(1, 'Minimum CTC is required'),
+    max: z.string().min(1, 'Maximum CTC is required'),
+  }).refine(data => Number(data.max) >= Number(data.min), {
     message: 'Maximum CTC must be greater than or equal to Minimum CTC',
     path: ['max'],
   }),
   ctcBreakup: z.string().optional(),
   internshipDetails: z.object({
     duration: z.string().optional(),
-    stipend: z.string().transform(val => Number(val || 0)).optional(),
+    stipend: z.string().optional(),
   }).optional(),
-  expectedHires: z.string().min(1, 'Expected hires is required').transform(val => Number(val)),
+  expectedHires: z.string().min(1, 'Expected hires is required'),
   assignedUsers: z.array(z.string()).optional(),
   contactPersons: z.array(z.string()).min(1, 'At least one contact person is required'),
   applicationDeadline: z.string().min(1, 'Application deadline is required'),
   eligibilityCriteria: z.object({
     departments: z.array(z.string()).min(1, 'At least one department is required'),
-    minCGPA: z.string().min(1, 'Minimum CGPA is required').transform(val => Number(val)),
+    minCGPA: z.string().min(1, 'Minimum CGPA is required'),
     otherRequirements: z.string().optional(),
   }),
   interviewProcess: z.array(z.object({
@@ -86,15 +86,6 @@ const CreateJobPage: React.FC = () => {
       router.push('/login');
     }
   }, [isAuthenticated, router, user]);
-
-  if (!user || user.role !== UserRole.UNIVERSITY_ADMIN || !user.universityId) {
-    return null;
-  }
-
-  // Filter sub-users for assigning jobs
-  const subUsers = users.filter(u => 
-    u.role === UserRole.SUB_USER && u.universityId === user.universityId
-  );
 
   // Get companies for dropdown
   const companyOptions = companies.map(company => ({
@@ -160,12 +151,35 @@ const CreateJobPage: React.FC = () => {
     label: `${person.name} (${person.designation})`,
   })) || [];
 
+  // Check if user exists and has correct role
+  if (!user || user.role !== UserRole.UNIVERSITY_ADMIN || !user.universityId) {
+    return null;
+  }
+
+  // Filter sub-users for assigning jobs
+  const subUsers = users.filter(u => 
+    u.role === UserRole.SUB_USER && u.universityId === user.universityId
+  );
+
   const onSubmit = async (data: JobFormData) => {
     setIsSubmitting(true);
     
-    // Format the data
+    // Format the data - transform string values to numbers where needed
     const jobData = {
       ...data,
+      ctcRange: {
+        min: Number(data.ctcRange.min),
+        max: Number(data.ctcRange.max),
+      },
+      internshipDetails: data.internshipDetails ? {
+        duration: data.internshipDetails.duration,
+        stipend: data.internshipDetails.stipend ? Number(data.internshipDetails.stipend) : 0,
+      } : undefined,
+      expectedHires: Number(data.expectedHires),
+      eligibilityCriteria: {
+        ...data.eligibilityCriteria,
+        minCGPA: Number(data.eligibilityCriteria.minCGPA),
+      },
       universityId: user.universityId,
       createdBy: user.id,
       createdAt: new Date().toISOString(),
@@ -219,15 +233,22 @@ const CreateJobPage: React.FC = () => {
                     fullWidth
                   />
                   
-                  <Select
-                    label="Company"
-                    options={[
-                      { value: '', label: 'Select a company', disabled: true },
-                      ...companyOptions,
-                    ]}
-                    {...register('companyId')}
-                    error={errors.companyId?.message}
-                    fullWidth
+                  <Controller
+                    name="companyId"
+                    control={control}
+                    render={({ field }) => (
+                      <Select
+                        label="Company"
+                        options={[
+                          { value: '', label: 'Select a company', disabled: true },
+                          ...companyOptions,
+                        ]}
+                        value={field.value}
+                        onChange={field.onChange}
+                        error={errors.companyId?.message}
+                        fullWidth
+                      />
+                    )}
                   />
                   
                   <Input
@@ -238,31 +259,45 @@ const CreateJobPage: React.FC = () => {
                     fullWidth
                   />
                   
-                  <Select
-                    label="Job Type"
-                    options={[
-                      { value: JobType.FULL_TIME, label: 'Full Time' },
-                      { value: JobType.PART_TIME, label: 'Part Time' },
-                      { value: JobType.INTERNSHIP, label: 'Internship' },
-                      { value: JobType.CONTRACT, label: 'Contract' },
-                    ]}
-                    {...register('jobType')}
-                    error={errors.jobType?.message}
-                    fullWidth
+                  <Controller
+                    name="jobType"
+                    control={control}
+                    render={({ field }) => (
+                      <Select
+                        label="Job Type"
+                        options={[
+                          { value: JobType.FULL_TIME, label: 'Full Time' },
+                          { value: JobType.PART_TIME, label: 'Part Time' },
+                          { value: JobType.INTERNSHIP, label: 'Internship' },
+                          { value: JobType.CONTRACT, label: 'Contract' },
+                        ]}
+                        value={field.value}
+                        onChange={field.onChange}
+                        error={errors.jobType?.message}
+                        fullWidth
+                      />
+                    )}
                   />
                   
-                  <Select
-                    label="Status"
-                    options={[
-                      { value: JobStatus.DRAFT, label: 'Draft' },
-                      { value: JobStatus.OPEN, label: 'Open' },
-                      { value: JobStatus.IN_PROGRESS, label: 'In Progress' },
-                      { value: JobStatus.COMPLETED, label: 'Completed' },
-                      { value: JobStatus.CANCELLED, label: 'Cancelled' },
-                    ]}
-                    {...register('status')}
-                    error={errors.status?.message}
-                    fullWidth
+                  <Controller
+                    name="status"
+                    control={control}
+                    render={({ field }) => (
+                      <Select
+                        label="Status"
+                        options={[
+                          { value: JobStatus.DRAFT, label: 'Draft' },
+                          { value: JobStatus.OPEN, label: 'Open' },
+                          { value: JobStatus.IN_PROGRESS, label: 'In Progress' },
+                          { value: JobStatus.COMPLETED, label: 'Completed' },
+                          { value: JobStatus.CANCELLED, label: 'Cancelled' },
+                        ]}
+                        value={field.value}
+                        onChange={field.onChange}
+                        error={errors.status?.message}
+                        fullWidth
+                      />
+                    )}
                   />
                   
                   <Input
@@ -579,17 +614,24 @@ const CreateJobPage: React.FC = () => {
                         fullWidth
                       />
                       
-                      <Select
-                        label="Status"
-                        options={[
-                          { value: InterviewStatus.SCHEDULED, label: 'Scheduled' },
-                          { value: InterviewStatus.IN_PROGRESS, label: 'In Progress' },
-                          { value: InterviewStatus.COMPLETED, label: 'Completed' },
-                          { value: InterviewStatus.CANCELLED, label: 'Cancelled' },
-                        ]}
-                        {...register(`interviewProcess.${index}.status`)}
-                        error={errors.interviewProcess?.[index]?.status?.message}
-                        fullWidth
+                      <Controller
+                        name={`interviewProcess.${index}.status`}
+                        control={control}
+                        render={({ field }) => (
+                          <Select
+                            label="Status"
+                            options={[
+                              { value: InterviewStatus.SCHEDULED, label: 'Scheduled' },
+                              { value: InterviewStatus.IN_PROGRESS, label: 'In Progress' },
+                              { value: InterviewStatus.COMPLETED, label: 'Completed' },
+                              { value: InterviewStatus.CANCELLED, label: 'Cancelled' },
+                            ]}
+                            value={field.value}
+                            onChange={field.onChange}
+                            error={errors.interviewProcess?.[index]?.status?.message}
+                            fullWidth
+                          />
+                        )}
                       />
                       
                       <div className="md:col-span-2">
@@ -619,7 +661,7 @@ const CreateJobPage: React.FC = () => {
                 <Button 
                   type="submit" 
                   isLoading={isSubmitting}
-                  loadingText="Creating Job..."
+                  
                 >
                   Create Job
                 </Button>
@@ -633,4 +675,3 @@ const CreateJobPage: React.FC = () => {
 };
 
 export default CreateJobPage;
-
