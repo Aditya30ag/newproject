@@ -1,0 +1,398 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User model with role-based access control
+model User {
+  id              String         @id @default(cuid())
+  name            String
+  email           String         @unique
+  password        String?
+  image           String?
+  role            Role           @default(SUB_USER)
+  emailVerified   DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  university      University?    @relation(fields: [universityId], references: [id])
+  universityId    String?
+  assignedJobs    SubUserJob[]
+  jobsCreated     Job[]          @relation("CreatedBy")
+  jobsUpdated     Job[]          @relation("UpdatedBy")
+  accounts        Account[]
+  sessions        Session[]
+  activityLogs    ActivityLog[]
+  notifications   Notification[]
+}
+
+// Role enum for different user types
+enum Role {
+  SUPER_ADMIN
+  UNIVERSITY_ADMIN
+  SUB_USER
+}
+
+// University model
+model University {
+  id              String           @id @default(cuid())
+  name            String
+  logo            String?
+  address         String?
+  city            String?
+  state           String?
+  country         String?
+  zipCode         String?
+  website         String?
+  contactEmail    String?
+  contactPhone    String?
+  isActive        Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  users           User[]
+  students        Student[]
+  departments     Department[]
+  jobs            Job[]
+  companies       CompanyUniversity[]
+}
+
+// Department model
+model Department {
+  id              String           @id @default(cuid())
+  name            String
+  code            String?
+  description     String?
+  university      University       @relation(fields: [universityId], references: [id], onDelete: Cascade)
+  universityId    String
+  students        Student[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@unique([universityId, name])
+}
+
+// Company model
+model Company {
+  id              String             @id @default(cuid())
+  name            String
+  logo            String?
+  website         String?
+  industry        String?
+  description     String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  contactPersons  CompanyContact[]
+  jobs            Job[]
+  universities    CompanyUniversity[]
+}
+
+// Company and University relationship
+model CompanyUniversity {
+  id              String           @id @default(cuid())
+  company         Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  companyId       String
+  university      University       @relation(fields: [universityId], references: [id], onDelete: Cascade)
+  universityId    String
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@unique([companyId, universityId])
+}
+
+// Company contact person model
+model CompanyContact {
+  id              String           @id @default(cuid())
+  name            String
+  email           String
+  phone           String?
+  designation     String?
+  isPrimary       Boolean          @default(false)
+  company         Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  companyId       String
+  jobPOCs         JobPOC[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+}
+
+// Job model
+model Job {
+  id                String           @id @default(cuid())
+  title             String
+  description       String?
+  jobDescriptionUrl String?
+  jobType           JobType          @default(FULL_TIME)
+  locationType      LocationType     @default(ONSITE)
+  location          String?
+  ctcRangeMin       Float?
+  ctcRangeMax       Float?
+  ctcBreakup        Json?
+  isInternship      Boolean          @default(false)
+  internshipDuration Int?            // Duration in weeks
+  internshipStipend Float?
+  expectedHires     Int?
+  status            JobStatus        @default(DRAFT)
+  applyBy           DateTime?
+  createdBy         User             @relation("CreatedBy", fields: [createdById], references: [id])
+  createdById       String
+  updatedBy         User?            @relation("UpdatedBy", fields: [updatedById], references: [id])
+  updatedById       String?
+  company           Company          @relation(fields: [companyId], references: [id])
+  companyId         String
+  university        University       @relation(fields: [universityId], references: [id])
+  universityId      String
+  requirements      String?
+  responsibilities  String?
+  rounds            InterviewRound[]
+  contactPersons    JobPOC[]
+  applications      Application[]
+  subUserJobs       SubUserJob[]
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+}
+
+// Job type enum
+enum JobType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+}
+
+// Location type enum
+enum LocationType {
+  ONSITE
+  REMOTE
+  HYBRID
+}
+
+// Job status enum
+enum JobStatus {
+  DRAFT
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+// Job and Contact Person relationship
+model JobPOC {
+  id                 String           @id @default(cuid())
+  job                Job              @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  jobId              String
+  contactPerson      CompanyContact   @relation(fields: [contactPersonId], references: [id], onDelete: Cascade)
+  contactPersonId    String
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@unique([jobId, contactPersonId])
+}
+
+// Sub-user and Job assignment relationship
+model SubUserJob {
+  id                 String           @id @default(cuid())
+  user               User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId             String
+  job                Job              @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  jobId              String
+  canEditJobDetails  Boolean          @default(false)
+  canManageStudents  Boolean          @default(true)
+  canScheduleInterviews Boolean       @default(true)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@unique([userId, jobId])
+}
+
+// Student model
+model Student {
+  id                 String           @id @default(cuid())
+  firstName          String
+  lastName           String
+  email              String
+  phone              String?
+  rollNumber         String?
+  registrationNumber String?
+  dateOfBirth        DateTime?
+  gender             String?
+  address            String?
+  city               String?
+  state              String?
+  country            String?
+  zipCode            String?
+  yearOfGraduation   Int?
+  cgpa               Float?
+  resumeUrl          String?
+  department         Department       @relation(fields: [departmentId], references: [id])
+  departmentId       String
+  university         University       @relation(fields: [universityId], references: [id])
+  universityId       String
+  applications       Application[]
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@unique([universityId, email])
+  @@unique([universityId, rollNumber])
+  @@index([universityId, departmentId])
+}
+
+// Application model
+model Application {
+  id                 String           @id @default(cuid())
+  student            Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  studentId          String
+  job                Job              @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  jobId              String
+  status             ApplicationStatus @default(APPLIED)
+  appliedAt          DateTime         @default(now())
+  resumeUrl          String?
+  coverLetterUrl     String?
+  interviewRounds    InterviewResult[]
+  offerDetails       Offer?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@unique([studentId, jobId])
+}
+
+// Application status enum
+enum ApplicationStatus {
+  APPLIED
+  SHORTLISTED
+  INTERVIEWING
+  SELECTED
+  REJECTED
+  OFFER_ACCEPTED
+  OFFER_DECLINED
+  JOINED
+}
+
+// Interview round model
+model InterviewRound {
+  id                 String           @id @default(cuid())
+  job                Job              @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  jobId              String
+  name               String
+  description        String?
+  sequence           Int
+  interviewResults   InterviewResult[]
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@unique([jobId, sequence])
+}
+
+// Interview result model
+model InterviewResult {
+  id                 String           @id @default(cuid())
+  application        Application      @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  applicationId      String
+  interviewRound     InterviewRound   @relation(fields: [interviewRoundId], references: [id], onDelete: Cascade)
+  interviewRoundId   String
+  status             InterviewStatus  @default(SCHEDULED)
+  scheduledAt        DateTime?
+  location           String?
+  meetingLink        String?
+  feedback           String?
+  rating             Int?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@unique([applicationId, interviewRoundId])
+}
+
+// Interview status enum
+enum InterviewStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+  PASSED
+  FAILED
+}
+
+// Offer model
+model Offer {
+  id                 String           @id @default(cuid())
+  application        Application      @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  applicationId      String           @unique
+  ctc                Float
+  ctcBreakup         Json?
+  offerLetterUrl     String?
+  joiningDate        DateTime?
+  status             OfferStatus      @default(PENDING)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+}
+
+// Offer status enum
+enum OfferStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  JOINED
+}
+
+// Activity log model
+model ActivityLog {
+  id                 String           @id @default(cuid())
+  user               User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId             String
+  action             String
+  details            Json?
+  ipAddress          String?
+  userAgent          String?
+  createdAt          DateTime         @default(now())
+}
+
+// Notification model
+model Notification {
+  id                 String           @id @default(cuid())
+  user               User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId             String
+  title              String
+  message            String
+  isRead             Boolean          @default(false)
+  type               String?
+  link               String?
+  createdAt          DateTime         @default(now())
+}
+
+// NextAuth models
+model Account {
+  id                 String           @id @default(cuid())
+  userId             String
+  type               String
+  provider           String
+  providerAccountId  String
+  refresh_token      String?          @db.Text
+  access_token       String?          @db.Text
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String?          @db.Text
+  session_state      String?
+  user               User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id                 String           @id @default(cuid())
+  sessionToken       String           @unique
+  userId             String
+  expires            DateTime
+  user               User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier         String
+  token              String           @unique
+  expires            DateTime
+
+  @@unique([identifier, token])
+}
+
