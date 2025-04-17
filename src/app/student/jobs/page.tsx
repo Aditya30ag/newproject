@@ -87,7 +87,8 @@ const StudentJobs: React.FC = () => {
   const hasApplied = (jobId: string) => student.appliedJobs.includes(jobId);
 
   // Get department options
-  const departments = [...new Set(universityJobs.flatMap(job => job.eligibilityCriteria.departments))];
+  const departments = Array.from(new Set(universityJobs.flatMap(job => job.eligibilityCriteria.departments)));
+
 
   return (
     <MainLayout title="Available Jobs">
@@ -266,5 +267,3 @@ const StudentJobs: React.FC = () => {
 };
 
 export default StudentJobs;
-
-

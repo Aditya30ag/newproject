@@ -84,14 +84,15 @@ const UniversityStudents: React.FC = () => {
   );
 
   // Get unique departments for filter dropdown
-  const departments = [...new Set(universityStudents.map(student => student.department))];
+  const departments = Array.from(new Set(universityStudents.map(student => student.department)));
   const departmentOptions = [
     { value: '', label: 'All Departments' },
     ...departments.map(dept => ({ value: dept, label: dept })),
   ];
-
+  
   // Get unique batches for filter dropdown
-  const batches = [...new Set(universityStudents.map(student => student.batch))];
+  const batches = Array.from(new Set(universityStudents.map(student => student.batch)));
+  
   const batchOptions = [
     { value: '', label: 'All Batches' },
     ...batches.map(batch => ({ value: batch, label: batch })),

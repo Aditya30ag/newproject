@@ -21,6 +21,7 @@ import {
   UserPlusIcon,
 } from '@heroicons/react/24/outline';
 import Modal from '@/components/ui/Modal';
+import { useForm } from 'react-hook-form';
 
 const UniversityCompanies: React.FC = () => {
   const { user, isAuthenticated } = useAuth();
@@ -34,6 +35,21 @@ const UniversityCompanies: React.FC = () => {
   const [isAddContactModalOpen, setIsAddContactModalOpen] = useState(false);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
 
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors }
+  } = useForm({
+    defaultValues: {
+      name: '',
+      email: '',
+      phone: '',
+      designation: '',
+      isPrimary: false
+    }
+  });
+
   useEffect(() => {
     if (!isAuthenticated || user?.role !== UserRole.UNIVERSITY_ADMIN) {
       router.push('/login');
@@ -46,7 +62,7 @@ const UniversityCompanies: React.FC = () => {
 
   // Get companies that have participated in this university's placements
   const universityJobs = jobs.filter(job => job.universityId === user.universityId);
-  const participatedCompanyIds = [...new Set(universityJobs.map(job => job.companyId))];
+  const participatedCompanyIds = Array.from(new Set(universityJobs.map(job => job.companyId)));
   const participatedCompanies = companies.filter(company => participatedCompanyIds.includes(company.id));
   
   // Filter companies
@@ -80,7 +96,7 @@ const UniversityCompanies: React.FC = () => {
   );
 
   // Get unique industries for filter dropdown
-  const industries = [...new Set(companies.map(company => company.industry))];
+  const industries = Array.from(new Set(companies.map(company => company.industry)));
   const industryOptions = [
     { value: '', label: 'All Industries' },
     ...industries.map(industry => ({ value: industry, label: industry })),
@@ -112,6 +128,14 @@ const UniversityCompanies: React.FC = () => {
   const handleOpenAddContactModal = (companyId: string) => {
     setSelectedCompanyId(companyId);
     setIsAddContactModalOpen(true);
+    reset(); // Reset form when opening modal
+  };
+
+  // Handler for contact form submission
+  const onSubmitContact = (data: any) => {
+    console.log('Contact form data:', { ...data, companyId: selectedCompanyId });
+    setIsAddContactModalOpen(false);
+    reset();
   };
 
   return (
@@ -314,11 +338,13 @@ const UniversityCompanies: React.FC = () => {
       >
         <div className="space-y-4">
           {selectedCompanyId && (
-            <form className="space-y-4">
+            <form className="space-y-4" onSubmit={handleSubmit(onSubmitContact)}>
               <Input
                 label="Contact Name"
                 placeholder="Enter contact person's name"
                 fullWidth
+                {...register('name', { required: 'Name is required' })}
+                error={errors.name?.message}
               />
               
               <Input
@@ -326,18 +352,24 @@ const UniversityCompanies: React.FC = () => {
                 type="email"
                 placeholder="Enter contact's email address"
                 fullWidth
+                {...register('email', { required: 'Email is required' })}
+                error={errors.email?.message}
               />
               
               <Input
                 label="Phone Number"
                 placeholder="Enter contact's phone number"
                 fullWidth
+                {...register('phone', { required: 'Phone number is required' })}
+                error={errors.phone?.message}
               />
               
               <Input
                 label="Designation"
                 placeholder="Enter contact's job title or designation"
                 fullWidth
+                {...register('designation', { required: 'Designation is required' })}
+                error={errors.designation?.message}
               />
               
               <div className="flex items-center">
@@ -345,6 +377,7 @@ const UniversityCompanies: React.FC = () => {
                   id="isPrimary"
                   type="checkbox"
                   className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                  {...register('isPrimary')}
                 />
                 <label htmlFor="isPrimary" className="ml-2 text-sm text-gray-700">
                   Set as primary contact
@@ -355,7 +388,7 @@ const UniversityCompanies: React.FC = () => {
                 <Button variant="outline" onClick={() => setIsAddContactModalOpen(false)}>
                   Cancel
                 </Button>
-                <Button onClick={() => setIsAddContactModalOpen(false)}>
+                <Button type="submit">
                   Add Contact
                 </Button>
               </div>

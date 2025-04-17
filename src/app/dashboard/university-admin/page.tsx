@@ -35,7 +35,8 @@ const UniversityAdminDashboard: React.FC = () => {
   const universityId = user.universityId;
   const universityStudents = students.filter(s => s.universityId === universityId);
   const universityJobs = jobs.filter(j => j.universityId === universityId);
-  const participatingCompanies = [...new Set(universityJobs.map(j => j.companyId))].length;
+  const participatingCompanies = Array.from(new Set(universityJobs.map(j => j.companyId))).length;
+
   
   // Calculate stats
   const totalStudents = universityStudents.length;
